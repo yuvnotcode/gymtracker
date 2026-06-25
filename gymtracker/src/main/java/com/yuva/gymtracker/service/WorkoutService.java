@@ -2,6 +2,7 @@ package com.yuva.gymtracker.service;
 
 import com.yuva.gymtracker.entity.User;
 import com.yuva.gymtracker.entity.Workout;
+import com.yuva.gymtracker.exception.UserNotFoundException;
 import com.yuva.gymtracker.repository.UserRepository;
 import com.yuva.gymtracker.repository.WorkoutRepository;
 import org.springframework.stereotype.Service;
@@ -21,7 +22,7 @@ public class WorkoutService {
 
     public Workout createWorkout(Long userId, Workout workout){
        User user = userRepository.findById(userId)
-               .orElseThrow(()->new RuntimeException("User not found"));
+               .orElseThrow(()->new UserNotFoundException("User not found"));
        workout.setUser(user);
        return workoutRepository.save(workout);
     }
