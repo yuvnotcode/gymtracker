@@ -86,33 +86,6 @@ Keep that PowerShell window open while using the app. Open **http://localhost:80
 
 Stop the app by selecting its PowerShell window and pressing **Ctrl+C**.
 
-## 4. Push your changes to the configured GitHub repository
-
-The Git repository is the outer `gymtracker` folder, one level above the Maven project. Open a second PowerShell window and run:
-
-```powershell
-cd C:\Users\yuva8\Documents\gymtracker
-git remote -v
-```
-
-Confirm `origin` points to your GitHub repository. Then stop tracking local IntelliJ project settings (the files stay on your computer), stage the app and README, and review what will be uploaded:
-
-```powershell
-git rm -r --cached .idea
-git add -A
-git status
-git diff --cached --stat
-```
-
-Check that the README and source files are listed, `.idea` is not listed, and no passwords or private tokens appear in staged changes. Commit and push the current `master` branch:
-
-```powershell
-git commit -m "Build Gymtracker workout logging app"
-git push -u origin master
-```
-
-If Git asks you to authenticate, complete the browser or Git Credential Manager sign-in prompt. Do not paste a GitHub password or personal access token into a command or commit it into a file.
-
 ## Troubleshooting
 
 - **`release version 25 not supported`:** `mvn -version` is using an older Java runtime. Set `JAVA_HOME` and `Path` to your JDK 25 `bin` folder, then check `mvn -version` again.
