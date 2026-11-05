@@ -10,4 +10,7 @@ import lombok.*;
 public class LoginResponseDto {
 
     private String token;
+    private Long id;
+    private String name;
+    private String email;
 }

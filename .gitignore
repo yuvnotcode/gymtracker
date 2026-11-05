@@ -1,0 +1,17 @@
+# Java / Maven build output
+target/
+**/target/
+
+# IDE and editor settings
+.idea/
+*.iml
+.vscode/
+
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+
+# Operating system files
+.DS_Store
+Thumbs.db

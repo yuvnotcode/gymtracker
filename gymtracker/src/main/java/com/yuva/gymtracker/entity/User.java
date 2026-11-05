@@ -42,6 +42,9 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Goal goal;
 
+    @Enumerated(EnumType.STRING)
+    private SplitType splitType;
+
     @OneToMany(mappedBy = "user")
     @JsonManagedReference
     private List<Workout> workouts;

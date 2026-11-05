@@ -1,259 +1,139 @@
-# 🏋️ GymTracker Backend
+# Gymtracker
 
-A secure and scalable backend application built with **Java** and **Spring Boot** that helps users track workouts, exercises, and fitness progress. The project follows a clean layered architecture and implements JWT-based authentication for secure access to REST APIs.
+Gymtracker is a personal workout logging app built with Java 25, Spring Boot, MySQL, and a responsive browser interface. It lets you record workout sessions and working sets, keep unfinished sessions as drafts, review workout history, track exercise progress, choose a training split, and use a rest timer while training.
 
----
+## Features
 
-## 🚀 Features
+- Account registration and sign in
+- Workout sessions with multiple exercises
+- Per-set reps, weight, and reps in reserve (RIR)
+- Draft workouts that can be minimized and resumed on the same browser
+- Workout history with expandable exercise and set details
+- Session deletion
+- Weekly session count, training volume, and streak summary
+- Exercise progress report and personal bests
+- Saved training splits: Push/Pull/Legs, Upper/Lower, Bro Split, and Full Body
+- Rest timer with 60, 90, 120, and 180 second intervals
+- Responsive layout for desktop and mobile browsers
 
-- 🔐 JWT Authentication & Authorization
-- 👤 User Registration & Login
-- 🏋️ Workout Management
-- 💪 Exercise Tracking
-- 📊 Progress Tracking (In Progress)
-- ✅ CRUD Operations
-- 📦 Layered MVC Architecture
-- ⚠️ Global Exception Handling
-- 📄 DTO-based Request & Response Handling
-- ✔️ Input Validation
-- 📖 Swagger API Documentation
+## Requirements
 
----
+- Java Development Kit (JDK) 25
+- Apache Maven 3.9 or newer
+- MySQL Server running locally
+- MySQL Workbench (optional GUI for creating and viewing the database)
 
-## 🛠 Tech Stack
+> MySQL Workbench is a database client; make sure MySQL Server is installed and running as well.
 
-### Backend
+## 1. Create the database
 
-- Java 21
-- Spring Boot
-- Spring Security 6
-- Spring Data JPA
-- Hibernate ORM
+1. Open MySQL Workbench and connect to your local MySQL Server.
+2. Open a new SQL tab.
+3. Run this statement using the lightning bolt button:
 
-### Database
+   ```sql
+   CREATE DATABASE gymtracker CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   CREATE USER 'gymtracker_app'@'localhost' IDENTIFIED BY 'choose-a-strong-local-password';
+   GRANT ALL PRIVILEGES ON gymtracker.* TO 'gymtracker_app'@'localhost';
+   ```
 
-- MySQL
+The application creates or updates its tables when it starts.
 
-### Tools
+## 2. Set Java and database settings in PowerShell
 
-- Maven
-- Git
-- GitHub
-- Postman
-- Swagger/OpenAPI
-- IntelliJ IDEA
+Open PowerShell and go to the Maven project folder:
 
----
-
-## 📂 Project Structure
-
-```
-src
- ├── controller
- ├── service
- ├── repository
- ├── entity
- ├── dto
- ├── security
- ├── config
- ├── exception
- └── util
+```powershell
+cd C:\Users\yuva8\Documents\gymtracker\gymtracker
 ```
 
-The project follows a layered architecture:
+If Java 25 is not already selected in this PowerShell window, set it (adjust the path if your JDK is installed elsewhere):
 
-```
-Client
-   ↓
-Controller
-   ↓
-Service
-   ↓
-Repository
-   ↓
-Database
+```powershell
+$env:JAVA_HOME = "C:\Users\yuva8\.jdks\azul-25.0.5.0.3"
+$env:Path = "$env:JAVA_HOME\bin;$env:Path"
 ```
 
----
+Check Java and Maven use Java 25:
 
-## 🔑 Authentication
-
-The application uses **JWT (JSON Web Tokens)** for authentication.
-
-Flow:
-
-```
-User Register/Login
-        ↓
-Spring Security
-        ↓
-Generate JWT Token
-        ↓
-Client Stores Token
-        ↓
-Token Sent in Authorization Header
-        ↓
-Protected APIs Accessed
+```powershell
+java -version
+mvn -version
 ```
 
-Authorization Header:
+Set the MySQL connection values. When prompted, enter the password you chose for `gymtracker_app`:
 
-```
-Authorization: Bearer <JWT_TOKEN>
-```
-
----
-
-## 📌 Current Modules
-
-### User Module
-
-- Register User
-- Login User
-- Password Encryption (BCrypt)
-
-### Workout Module
-
-- Create Workout
-- Update Workout
-- Delete Workout
-- View User Workouts
-
-### Exercise Module
-
-- Add Exercises
-- Update Exercises
-- Delete Exercises
-
-### Progress Module
-
-- Track Weight
-- Workout Progress
-- Coming Soon...
-
----
-
-## 📡 REST APIs
-
-### Authentication
-
-| Method | Endpoint |
-|---------|----------|
-| POST | `/auth/register` |
-| POST | `/auth/login` |
-
----
-
-### User
-
-| Method | Endpoint |
-|---------|----------|
-| GET | `/users/{id}` |
-| PUT | `/users/{id}` |
-| DELETE | `/users/{id}` |
-
----
-
-### Workout
-
-| Method | Endpoint |
-|---------|----------|
-| POST | `/users/{id}/workouts` |
-| GET | `/users/{id}/workouts` |
-| PUT | `/workouts/{id}` |
-| DELETE | `/workouts/{id}` |
-
----
-
-## ⚙️ Installation
-
-Clone the repository
-
-```bash
-git clone https://github.com/yuvnotcode/gymtracker.git
+```powershell
+$env:DB_URL = "jdbc:mysql://localhost:3306/gymtracker"
+$env:DB_USERNAME = "gymtracker_app"
+$env:DB_PASSWORD = Read-Host "MySQL password"
+$jwtBytes = New-Object byte[] 32
+[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($jwtBytes)
+$env:JWT_SECRET = [Convert]::ToBase64String($jwtBytes)
 ```
 
-Move into the project
+These values apply only to the current PowerShell window. Keep the JWT secret private. If you close the window, set the values again before starting the app.
 
-```bash
-cd gymtracker
-```
+## 3. Start Gymtracker
 
-Configure your database in
+From the `gymtracker` Maven project folder, run:
 
-```
-application.yml
-```
-
-Run the application
-
-```bash
+```powershell
 mvn spring-boot:run
 ```
 
----
+Keep that PowerShell window open while using the app. Open **http://localhost:8081** in your browser and create an account.
 
-## 🧪 Testing
+Stop the app by selecting its PowerShell window and pressing **Ctrl+C**.
 
-API endpoints are tested using **Postman**.
+## 4. Push your changes to the configured GitHub repository
 
-Swagger UI:
+The Git repository is the outer `gymtracker` folder, one level above the Maven project. Open a second PowerShell window and run:
 
+```powershell
+cd C:\Users\yuva8\Documents\gymtracker
+git remote -v
 ```
-http://localhost:8080/swagger-ui/index.html
+
+Confirm `origin` points to your GitHub repository. Then stop tracking local IntelliJ project settings (the files stay on your computer), stage the app and README, and review what will be uploaded:
+
+```powershell
+git rm -r --cached .idea
+git add -A
+git status
+git diff --cached --stat
 ```
 
----
+Check that the README and source files are listed, `.idea` is not listed, and no passwords or private tokens appear in staged changes. Commit and push the current `master` branch:
 
-## 📈 Upcoming Features
+```powershell
+git commit -m "Build Gymtracker workout logging app"
+git push -u origin master
+```
 
-- 📊 Analytics Dashboard
-- 🔥 Calories Tracking
-- 📅 Workout Calendar
-- 📈 Progress Charts
-- 📷 Profile Images
-- 📱 Email Verification
-- 🔄 Password Reset
-- 🏆 Fitness Goals
-- 👥 Role-Based Authorization
-- 🐳 Docker Support
-- ☁️ Deployment
-- ✅ Unit & Integration Testing
+If Git asks you to authenticate, complete the browser or Git Credential Manager sign-in prompt. Do not paste a GitHub password or personal access token into a command or commit it into a file.
 
----
+## Troubleshooting
 
-## 💡 What I Learned
+- **`release version 25 not supported`:** `mvn -version` is using an older Java runtime. Set `JAVA_HOME` and `Path` to your JDK 25 `bin` folder, then check `mvn -version` again.
+- **Cannot connect to MySQL:** Confirm MySQL Server is running, the `gymtracker` schema exists, and `DB_USERNAME` / `DB_PASSWORD` are correct.
+- **Missing JWT secret:** Set `JWT_SECRET` in the same PowerShell window before starting the app. Use the command above to generate a fresh one.
+- **Changes do not appear in the browser:** Restart the app, then hard-refresh the page with **Ctrl+Shift+R**.
 
-Through this project I gained hands-on experience with:
+## Project layout
 
-- Spring Boot
-- Spring Security
-- JWT Authentication
-- REST API Development
-- Hibernate & JPA
-- MySQL
-- Layered Architecture
-- Dependency Injection
-- DTO Pattern
-- Exception Handling
-- API Testing with Postman
-- Git & GitHub
+```text
+gymtracker/                 Git repository root
+├── README.md
+└── gymtracker/              Spring Boot / Maven project
+    ├── pom.xml
+    └── src/main/
+        ├── java/            API, security, services, and database entities
+        └── resources/
+            ├── application.yaml
+            └── static/      Browser application (HTML, CSS, JavaScript)
+```
 
----
+## Security note
 
-## 👨‍💻 Author
-
-**Yuvaditya Verma**
-
-LinkedIn:
-https://linkedin.com/in/yuvaditya-verma
-
-GitHub:
-https://github.com/yuvnotcode
-
-Email:
-yuva8954@gmail.com
-
----
-
-## ⭐ If you found this project interesting, consider giving it a star!
+Database credentials and the JWT signing key are supplied through environment variables and should never be committed. The generated JWT secret is temporary for this local run; changing it signs out existing sessions. Earlier versions of this project had local credentials in tracked files. If those versions were pushed to a public GitHub repository, change the exposed MySQL password and treat the old JWT key as compromised; deleting the values in a new commit does not erase them from Git history. This project is intended for local development and has not been configured for public production deployment.

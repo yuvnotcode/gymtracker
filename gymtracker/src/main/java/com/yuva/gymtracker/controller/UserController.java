@@ -9,7 +9,6 @@ import com.yuva.gymtracker.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/users")
@@ -20,16 +19,11 @@ public class UserController {
         this.userService=userService;
     }
 
-    @GetMapping
-    public List<User> getAllUsers(){
-        return userService.getAllUsers();
-    }
-
     @PostMapping("/register")
     public UserResponseDto registerUser(@Valid @RequestBody UserRequestDto requestDto){
         User user = User.builder()
                 .name(requestDto.getName())
-                .email(requestDto.getEmail())
+                .email(requestDto.getEmail().trim().toLowerCase(java.util.Locale.ROOT))
                 .password(requestDto.getPassword())
                 .age(requestDto.getAge())
                 .currentWeight(requestDto.getCurrentWeight())
@@ -48,7 +42,7 @@ public class UserController {
     }
     @PostMapping("/login")
     public LoginResponseDto login(
-            @RequestBody LoginRequestDto requestDto){
+            @Valid @RequestBody LoginRequestDto requestDto){
         return userService.login(requestDto);
     }
 }
