@@ -10,10 +10,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        format_sql: false
 
 server:
   port: 8081
@@ -21,3 +21,4 @@ server:
 app:
   security:
     jwt-secret: ${JWT_SECRET}
+  registration-code: ${APP_REGISTRATION_CODE:}

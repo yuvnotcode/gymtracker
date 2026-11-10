@@ -1,5 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { token: localStorage.getItem('gymtracker.token'), user: JSON.parse(localStorage.getItem('gymtracker.user') || 'null'), mode: 'login', workouts: [], draft: null, splitType: 'FULL_BODY' };
+const defaultCustomSplitDays = ['Push','Pull','Legs','Rest','Upper','Lower'];
+const state = { token: localStorage.getItem('gymtracker.token'), user: JSON.parse(localStorage.getItem('gymtracker.user') || 'null'), mode: 'login', workouts: [], draft: null, splitType: 'FULL_BODY', customSplitDays: [...defaultCustomSplitDays], customSplitEditorOpen: false };
 const splitPlans = {
   PUSH_PULL_LEGS: ['Push', 'Pull', 'Legs'],
   UPPER_LOWER: ['Upper', 'Lower'],
@@ -35,7 +36,7 @@ async function api(path, options = {}) {
   const body = await response.text();
   return body.trim() ? JSON.parse(body) : null;
 }
-function logout() { stopRestTimer(''); state.token = null; state.user = null; state.workouts = []; state.splitType = 'FULL_BODY'; localStorage.removeItem('gymtracker.token'); localStorage.removeItem('gymtracker.user'); showApp(); }
+function logout() { stopRestTimer(''); state.token = null; state.user = null; state.workouts = []; state.splitType = 'FULL_BODY'; state.customSplitDays=[...defaultCustomSplitDays]; state.customSplitEditorOpen=false; localStorage.removeItem('gymtracker.token'); localStorage.removeItem('gymtracker.user'); showApp(); }
 $('#logout').addEventListener('click', logout);
 $('#logout-mobile').addEventListener('click', logout);
 
@@ -52,6 +53,7 @@ $('#auth-form').addEventListener('submit', async event => {
   $('#auth-error').textContent = ''; const submit = $('#auth-submit'); submit.disabled = true;
   try {
     if (state.mode === 'register') {
+      if (!payload.registrationCode) delete payload.registrationCode;
       if (!payload.age) delete payload.age; else payload.age = Number(payload.age);
       if (!payload.currentWeight) delete payload.currentWeight; else payload.currentWeight = Number(payload.currentWeight);
       const registered = await api('/users/register', { method: 'POST', body: JSON.stringify(payload) });
@@ -99,6 +101,7 @@ function renderWorkouts() {
   $('#streak-value').textContent=streak;$('#streak-track').style.width=`${Math.min(100,streak*14)}%`;
   renderProgress();
   renderSplit();
+  refreshPreviousPerformanceHints();
 }
 async function loadWorkouts() { try { state.workouts = await api(`/users/${state.user.id}/workouts`); renderWorkouts(); } catch(error) { console.error(error); } }
 async function deleteWorkout(id) { try { await api(`/workouts/${id}`, {method:'DELETE'}); state.workouts = state.workouts.filter(item=>item.id!==id); renderWorkouts(); } catch(error) { window.alert(error.message); } }
@@ -129,21 +132,91 @@ function drawProgress(exercise){
   coords.forEach(({x,y,p},i)=>{const circle=svgNode('circle',{cx:x,cy:y,r:i===coords.length-1?6:4,class:i===coords.length-1?'chart-point current':'chart-point'});const title=svgNode('title');title.textContent=`${p.date}: ${label(p)}`;circle.append(title);chart.append(circle);});
   const last=coords.at(-1);const value=svgNode('text',{x:last.x,y:Math.max(15,last.y-14),'text-anchor':last.x>W-120?'end':'middle',class:'chart-value'});value.textContent=`${last.p.weight} KG`;chart.append(value);
 }
-function nextSplitDay(){
-  const plan=splitPlans[state.splitType]||splitPlans.FULL_BODY;
-  const sessions=[...new Map(state.workouts.map(item=>[`${item.workoutDate}|${item.workoutName}`,{date:item.workoutDate,name:item.workoutName}])).values()].sort((a,b)=>a.date.localeCompare(b.date));
-  const normalize=value=>(value||'').toLowerCase().replace(/[^a-z0-9]/g,'');
-  for(let i=sessions.length-1;i>=0;i--){const name=normalize(sessions[i].name);const index=plan.findIndex(day=>name.includes(normalize(day))||normalize(day).includes(name));if(index>=0)return plan[(index+1)%plan.length];}
-  return plan[0];
+function currentSplitPlan(type=$('#split-select').value||state.splitType){
+  if(type==='CUSTOM')return state.customSplitDays.length?state.customSplitDays:defaultCustomSplitDays;
+  return splitPlans[type]||splitPlans.FULL_BODY;
 }
-function renderSplit(){
+function nextSplitDay(plan=currentSplitPlan(state.splitType)){
+  const sessions=[...new Map(state.workouts.map(item=>[`${item.workoutDate}|${item.workoutName}`,{date:item.workoutDate,name:item.workoutName}])).values()].sort((a,b)=>b.date.localeCompare(a.date));
+  const normalize=value=>(value||'').toLocaleLowerCase().replace(/[^a-z0-9]/g,'');
+  let lastIndex=-1;
+  for(const session of sessions){
+    const sessionName=normalize(session.name);
+    const found=plan.findIndex(day=>!/^rest$/i.test(day)&&sessionName.includes(normalize(day)));
+    if(found>=0){lastIndex=found;break;}
+  }
+  for(let offset=1;offset<=plan.length;offset++){
+    const candidate=plan[(lastIndex+offset)%plan.length];
+    if(!/^rest$/i.test(candidate))return candidate;
+  }
+  return 'Workout';
+}
+function renderCustomSplitEditor(){
+  const container=$('#custom-split-days');container.replaceChildren();
+  state.customSplitDays.forEach((day,index)=>{
+    const row=document.createElement('div');row.className='custom-split-row';
+    const number=document.createElement('span');number.className='custom-split-number';number.textContent=String(index+1).padStart(2,'0');
+    const input=document.createElement('input');input.type='text';input.maxLength=40;input.value=day;input.setAttribute('aria-label',`Training day ${index+1}`);input.placeholder='e.g. Push or Rest';
+    input.addEventListener('input',()=>{state.customSplitDays[index]=input.value;updateCustomSplitCount();renderSplit(false);});
+    const controls=document.createElement('div');controls.className='custom-split-row-controls';
+    const up=document.createElement('button');up.type='button';up.textContent='↑';up.title='Move day up';up.setAttribute('aria-label',`Move ${day||`day ${index+1}`} up`);up.disabled=index===0;
+    up.addEventListener('click',()=>{[state.customSplitDays[index-1],state.customSplitDays[index]]=[state.customSplitDays[index],state.customSplitDays[index-1]];renderSplit();});
+    const down=document.createElement('button');down.type='button';down.textContent='↓';down.title='Move day down';down.setAttribute('aria-label',`Move ${day||`day ${index+1}`} down`);down.disabled=index===state.customSplitDays.length-1;
+    down.addEventListener('click',()=>{[state.customSplitDays[index+1],state.customSplitDays[index]]=[state.customSplitDays[index],state.customSplitDays[index+1]];renderSplit();});
+    const remove=document.createElement('button');remove.type='button';remove.textContent='×';remove.title='Remove day';remove.setAttribute('aria-label',`Remove ${day||`day ${index+1}`}`);remove.disabled=state.customSplitDays.length===1;
+    remove.addEventListener('click',()=>{state.customSplitDays.splice(index,1);renderSplit();});
+    controls.append(up,down,remove);row.append(number,input,controls);container.append(row);
+  });
+  updateCustomSplitCount();
+}
+function updateCustomSplitCount(){
+  $('#custom-split-count').textContent=`${state.customSplitDays.length} / 7 days`;
+  $('#add-split-day').disabled=state.customSplitDays.length>=7;
+}
+function renderSplit(renderEditor=true){
   const select=$('#split-select');if(!select)return;
-  if(select.value!==state.splitType)select.value=state.splitType;
-  const plan=splitPlans[state.splitType]||splitPlans.FULL_BODY;const next=nextSplitDay();$('#next-workout-name').textContent=next;
-  const days=$('#split-days');days.replaceChildren();plan.forEach((day,index)=>{const item=document.createElement('div');item.className=`split-day${day===next?' is-next':''}`;const number=document.createElement('span');number.textContent=String(index+1).padStart(2,'0');const name=document.createElement('strong');name.textContent=day;const tag=document.createElement('small');tag.textContent=day===next?'UP NEXT':'IN ROTATION';item.append(number,name,tag);days.append(item);});
+  const selectedType=select.value||state.splitType;
+  const custom=selectedType==='CUSTOM';
+  $('#custom-split-editor').hidden=!custom||!state.customSplitEditorOpen;
+  $('#edit-custom-split').hidden=!custom||state.customSplitEditorOpen;
+  const plan=currentSplitPlan(selectedType);
+  if(custom&&renderEditor)renderCustomSplitEditor();
+  const next=nextSplitDay(plan);$('#next-workout-name').textContent=next;
+  const days=$('#split-days');days.replaceChildren();
+  plan.forEach((day,index)=>{
+    const rest=/^rest$/i.test(day);const item=document.createElement('div');item.className=`split-day${day===next?' is-next':''}${rest?' is-rest':''}`;
+    const number=document.createElement('span');number.textContent=String(index+1).padStart(2,'0');
+    const name=document.createElement('strong');name.textContent=day;
+    const tag=document.createElement('small');tag.textContent=rest?'REST / RECOVERY':day===next?'UP NEXT':'IN ROTATION';
+    item.append(number,name,tag);days.append(item);
+  });
 }
-async function loadSplit(){try{const result=await api('/users/me/split');state.splitType=result.splitType||'FULL_BODY';$('#split-select').value=state.splitType;$('#split-status').textContent='';renderSplit();}catch(error){$('#split-status').textContent='Could not load your split. Refresh to try again.';}}
-$('#save-split').addEventListener('click',async()=>{const button=$('#save-split');const previous=state.splitType;const requested=$('#split-select').value;button.disabled=true;$('#split-status').textContent='Saving your plan…';state.splitType=requested;renderSplit();try{const result=await api('/users/me/split',{method:'PUT',body:JSON.stringify({splitType:requested})});state.splitType=result.splitType;$('#split-status').textContent='Saved to your account';renderSplit();}catch(error){state.splitType=previous;$('#split-status').textContent=error.message;renderSplit();}finally{button.disabled=false;}});
+async function loadSplit(){
+  try{
+    const result=await api('/users/me/split');
+    state.splitType=result.splitType||'FULL_BODY';
+    state.customSplitDays=result.customSplitDays?.length?result.customSplitDays:[...defaultCustomSplitDays];
+    state.customSplitEditorOpen=false;$('#split-select').value=state.splitType;$('#split-status').textContent='';renderSplit();
+  }catch(error){$('#split-status').textContent='Could not load your split. Refresh to try again.';}
+}
+$('#split-select').addEventListener('change',()=>{state.customSplitEditorOpen=$('#split-select').value==='CUSTOM';if(state.customSplitEditorOpen&&!state.customSplitDays.length)state.customSplitDays=[...defaultCustomSplitDays];renderSplit();$('#split-status').textContent='';});
+$('#edit-custom-split').addEventListener('click',()=>{state.customSplitEditorOpen=true;renderSplit();});
+$('#add-split-day').addEventListener('click',()=>{if(state.customSplitDays.length>=7)return;state.customSplitDays.push('Workout day');renderSplit();$('#custom-split-days .custom-split-row:last-child input')?.focus();});
+$('#save-split').addEventListener('click',async()=>{
+  const button=$('#save-split');const previousType=state.splitType;const previousDays=[...state.customSplitDays];const requested=$('#split-select').value;
+  const customDays=state.customSplitDays.map(day=>day.trim());
+  if(requested==='CUSTOM'&&(customDays.length<1||customDays.length>7||customDays.some(day=>!day)||customDays.every(day=>/^rest$/i.test(day)))){
+    $('#split-status').textContent='Add 1–7 named days, including at least one training day.';return;
+  }
+  button.disabled=true;$('#split-status').textContent='Saving your plan…';
+  try{
+    const result=await api('/users/me/split',{method:'PUT',body:JSON.stringify({splitType:requested,customSplitDays:requested==='CUSTOM'?customDays:[]})});
+    state.splitType=result.splitType;state.customSplitDays=result.customSplitDays?.length?result.customSplitDays:[...defaultCustomSplitDays];
+    state.customSplitEditorOpen=false;$('#split-select').value=state.splitType;$('#split-status').textContent='Saved to your account';renderSplit();
+  }catch(error){
+    state.splitType=previousType;state.customSplitDays=previousDays;$('#split-select').value=previousType;$('#split-status').textContent=error.message;renderSplit();
+  }finally{button.disabled=false;}
+});
 $('#progress-exercise').addEventListener('change',event=>{const item=state.workouts.find(workout=>workout.exerciseName?.trim().toLocaleLowerCase()===event.target.value);if(item)drawProgress({name:item.exerciseName,sets:state.workouts.filter(workout=>workout.exerciseName?.trim().toLocaleLowerCase()===event.target.value).flatMap(workout=>(workout.setDetails?.length?workout.setDetails:[{reps:workout.reps,weight:workout.weight}]).map(set=>({date:workout.workoutDate,weight:Number(set.weight)||0,reps:Number(set.reps)||0})))});});
 
 const navigationLinks=[...document.querySelectorAll('.side-nav .nav-item')];
@@ -185,12 +258,95 @@ function addSetRow(container, values={reps:10,weight:0,rir:''}) {
   const remove=document.createElement('button');remove.type='button';remove.className='remove-set';remove.textContent='×';remove.title='Remove set';remove.addEventListener('click',()=>{if(container.children.length>1){row.remove();[...container.children].forEach((el,i)=>el.querySelector('.set-count').textContent=i+1);saveDraft();}});row.prepend(count);row.append(remove);container.append(row);
 }
 function addExercise(name='', setValues=[]) {
-  const card=document.createElement('article');card.className='exercise-card dynamic-exercise';
-  const header=document.createElement('div');header.className='dynamic-exercise-heading';const title=document.createElement('strong');title.textContent=`Exercise ${$('#exercise-list').children.length+1}`;const remove=document.createElement('button');remove.type='button';remove.className='remove-set';remove.textContent='Remove';remove.addEventListener('click',()=>{if($('#exercise-list').children.length>1){card.remove();[...$('#exercise-list').children].forEach((el,i)=>el.querySelector('.dynamic-exercise-heading strong').textContent=`Exercise ${i+1}`);saveDraft();}});header.append(title,remove);
-  const label=document.createElement('label');label.textContent='Exercise name';const input=document.createElement('input');input.name='exerciseName';input.required=true;input.maxLength=100;input.placeholder='e.g. Barbell squat';input.value=name;label.append(input);
-  const setsHead=document.createElement('div');setsHead.className='sets-label-row';setsHead.innerHTML='<span>SETS</span><span>REPS</span><span>LOAD (KG)</span><span>RIR</span><span></span>';
-  const sets=document.createElement('div');sets.className='set-list';(setValues.length?setValues:[{reps:10,weight:0,rir:''},{reps:10,weight:0,rir:''},{reps:10,weight:0,rir:''}]).forEach(set=>addSetRow(sets,set));
-  const add=document.createElement('button');add.type='button';add.className='add-set';add.textContent='＋ Add set';add.addEventListener('click',()=>{addSetRow(sets,{reps:10,weight:0,rir:''});saveDraft();});card.append(header,label,setsHead,sets,add);$('#exercise-list').append(card);saveDraft();
+  const card=document.createElement('article');
+  card.className='exercise-card dynamic-exercise';
+
+  const header=document.createElement('div');
+  header.className='dynamic-exercise-heading';
+  const title=document.createElement('strong');
+  title.textContent=`Exercise ${$('#exercise-list').children.length+1}`;
+  const remove=document.createElement('button');
+  remove.type='button';
+  remove.className='remove-set';
+  remove.textContent='Remove';
+  remove.addEventListener('click',()=>{
+    if($('#exercise-list').children.length<=1)return;
+    card.remove();
+    [...$('#exercise-list').children].forEach((exercise,index)=>{
+      exercise.querySelector('.dynamic-exercise-heading strong').textContent=`Exercise ${index+1}`;
+    });
+    saveDraft();
+  });
+  header.append(title,remove);
+
+  const label=document.createElement('label');
+  label.textContent='Exercise name';
+  const input=document.createElement('input');
+  input.name='exerciseName';
+  input.required=true;
+  input.maxLength=100;
+  input.placeholder='e.g. Barbell squat';
+  input.value=name;
+  label.append(input);
+
+  const previous=document.createElement('div');
+  previous.className='previous-performance';
+
+  const setsHead=document.createElement('div');
+  setsHead.className='sets-label-row';
+  setsHead.innerHTML='<span>SETS</span><span>REPS</span><span>LOAD (KG)</span><span>RIR</span><span></span>';
+
+  const sets=document.createElement('div');
+  sets.className='set-list';
+  (setValues.length?setValues:[{reps:10,weight:0,rir:''},{reps:10,weight:0,rir:''},{reps:10,weight:0,rir:''}]).forEach(set=>addSetRow(sets,set));
+
+  const add=document.createElement('button');
+  add.type='button';
+  add.className='add-set';
+  add.textContent='＋ Add set';
+  add.addEventListener('click',()=>{addSetRow(sets,{reps:10,weight:0,rir:''});saveDraft();});
+  input.addEventListener('input',()=>renderPreviousPerformance(card,input.value));
+  card.append(header,label,previous,setsHead,sets,add);
+  $('#exercise-list').append(card);
+  renderPreviousPerformance(card,name);
+  saveDraft();
+}
+
+function findPreviousExercise(exerciseName){
+  const normalized=exerciseName.trim().toLocaleLowerCase();
+  if(!normalized)return null;
+  return state.workouts
+    .filter(workout=>workout.exerciseName?.trim().toLocaleLowerCase()===normalized)
+    .sort((a,b)=>(b.workoutDate||'').localeCompare(a.workoutDate||'')||(Number(b.id)||0)-(Number(a.id)||0))[0]||null;
+}
+
+function renderPreviousPerformance(card,exerciseName){
+  const container=card.querySelector('.previous-performance');
+  container.replaceChildren();
+  const previous=findPreviousExercise(exerciseName);
+  if(!previous)return;
+
+  const sets=previous.setDetails?.length?previous.setDetails:[{reps:previous.reps,weight:previous.weight,rir:null}];
+  const bestSet=sets.reduce((best,set)=>Number(set.weight)>Number(best.weight)?set:best,sets[0]);
+  const date=new Date(`${previous.workoutDate}T12:00:00`).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  const summary=document.createElement('span');
+  summary.textContent=`Last logged ${date} · ${sets.length} sets · best ${bestSet.weight} kg × ${bestSet.reps}`;
+  const copy=document.createElement('button');
+  copy.type='button';
+  copy.textContent='Copy last sets';
+  copy.addEventListener('click',()=>{
+    const setList=card.querySelector('.set-list');
+    setList.replaceChildren();
+    sets.forEach(set=>addSetRow(setList,{reps:set.reps,weight:set.weight,rir:set.rir??''}));
+    saveDraft();
+  });
+  container.append(summary,copy);
+}
+
+function refreshPreviousPerformanceHints(){
+  document.querySelectorAll('#exercise-list .dynamic-exercise').forEach(card=>{
+    renderPreviousPerformance(card,card.querySelector('[name="exerciseName"]').value);
+  });
 }
 function openModal() { if(state.draft)restoreDraft(state.draft);else{$('#workout-form').reset();$('#workout-form [name="workoutDate"]').value=dateInput(today);$('#workout-form [name="workoutName"]').value=nextSplitDay();$('#exercise-list').replaceChildren();addExercise();}$('#workout-error').textContent='';modal.hidden=false;saveDraft();$('#workout-form [name="workoutName"]').focus(); }
 function closeModal() { saveDraft();modal.hidden=true; }

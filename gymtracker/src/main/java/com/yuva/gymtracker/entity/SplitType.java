@@ -4,5 +4,6 @@ public enum SplitType {
     PUSH_PULL_LEGS,
     UPPER_LOWER,
     BRO_SPLIT,
-    FULL_BODY
+    FULL_BODY,
+    CUSTOM
 }

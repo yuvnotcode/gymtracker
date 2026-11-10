@@ -15,6 +15,7 @@ public class UserRequestDto {
     private String password;
     @NotBlank @Email
     private String email;
+    private String registrationCode;
     @Min(13) @Max(120)
     private Integer age;
     @Positive

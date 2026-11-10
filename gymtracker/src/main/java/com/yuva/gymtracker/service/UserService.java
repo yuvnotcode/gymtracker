@@ -2,13 +2,18 @@ package com.yuva.gymtracker.service;
 
 import com.yuva.gymtracker.dto.LoginRequestDto;
 import com.yuva.gymtracker.dto.LoginResponseDto;
+import com.yuva.gymtracker.dto.SplitPreferenceRequest;
+import com.yuva.gymtracker.dto.SplitPreferenceResponse;
 import com.yuva.gymtracker.entity.User;
 import com.yuva.gymtracker.entity.SplitType;
 import com.yuva.gymtracker.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.List;
+import java.util.ArrayList;
 
 @Service
 public class UserService {
@@ -37,7 +42,8 @@ public class UserService {
         return userRepository.findByEmail(email);
     }
 
-    public SplitType getSplitType(String email) {
+    @Transactional
+    public SplitPreferenceResponse getSplitPreference(String email) {
         User user = userRepository.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT))
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "User not found"));
@@ -45,20 +51,50 @@ public class UserService {
             user.setSplitType(SplitType.FULL_BODY);
             userRepository.save(user);
         }
-        return user.getSplitType();
+        List<String> customDays = user.getCustomSplitDays() == null ? List.of() : user.getCustomSplitDays();
+        return new SplitPreferenceResponse(user.getSplitType(), List.copyOf(customDays));
     }
 
-    public SplitType updateSplitType(String email, SplitType splitType) {
-        if (splitType == null) {
+    @Transactional
+    public SplitPreferenceResponse updateSplitPreference(String email, SplitPreferenceRequest request) {
+        if (request.getSplitType() == null) {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.BAD_REQUEST, "Choose a training split");
         }
         User user = userRepository.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT))
                 .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
                         org.springframework.http.HttpStatus.NOT_FOUND, "User not found"));
-        user.setSplitType(splitType);
+        List<String> days = request.getSplitType() == SplitType.CUSTOM
+                ? normalizeSplitDays(request.getCustomSplitDays())
+                : new ArrayList<>(user.getCustomSplitDays() == null ? List.of() : user.getCustomSplitDays());
+        user.setSplitType(request.getSplitType());
+        if (user.getCustomSplitDays() == null) {
+            user.setCustomSplitDays(new ArrayList<>(days));
+        } else {
+            user.getCustomSplitDays().clear();
+            user.getCustomSplitDays().addAll(days);
+        }
         userRepository.save(user);
-        return splitType;
+        return new SplitPreferenceResponse(user.getSplitType(), List.copyOf(user.getCustomSplitDays()));
+    }
+
+    private List<String> normalizeSplitDays(List<String> requestedDays) {
+        if (requestedDays == null || requestedDays.isEmpty() || requestedDays.size() > 7) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "A custom split must have between 1 and 7 days");
+        }
+        List<String> days = requestedDays.stream()
+                .map(day -> day == null ? "" : day.trim())
+                .toList();
+        if (days.stream().anyMatch(day -> day.isBlank())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Split day names cannot be blank");
+        }
+        if (days.stream().allMatch(day -> day.equalsIgnoreCase("Rest"))) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "A custom split needs at least one training day");
+        }
+        return days.stream().map(day -> day.equalsIgnoreCase("rest") ? "Rest" : day).toList();
     }
     public LoginResponseDto login(LoginRequestDto requestDto){
        String email = requestDto.getEmail().trim().toLowerCase(java.util.Locale.ROOT);

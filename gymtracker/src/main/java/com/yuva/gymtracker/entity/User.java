@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @Getter
 @Setter
@@ -43,7 +44,15 @@ public class User {
     private Goal goal;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "split_type", length = 32, columnDefinition = "varchar(32)")
     private SplitType splitType;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_custom_split_days", joinColumns = @JoinColumn(name = "user_id"))
+    @OrderColumn(name = "day_order")
+    @Column(name = "day_name", nullable = false, length = 40)
+    @Builder.Default
+    private List<String> customSplitDays = new ArrayList<>();
 
     @OneToMany(mappedBy = "user")
     @JsonManagedReference

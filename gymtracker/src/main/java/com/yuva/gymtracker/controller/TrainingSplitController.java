@@ -1,13 +1,12 @@
 package com.yuva.gymtracker.controller;
 
 import com.yuva.gymtracker.dto.SplitPreferenceRequest;
-import com.yuva.gymtracker.entity.SplitType;
+import com.yuva.gymtracker.dto.SplitPreferenceResponse;
 import com.yuva.gymtracker.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 
 @RestController
 @RequestMapping("/users/me/split")
@@ -19,13 +18,13 @@ public class TrainingSplitController {
     }
 
     @GetMapping
-    public Map<String, SplitType> getSplit(Authentication authentication) {
-        return Map.of("splitType", userService.getSplitType(authentication.getName()));
+    public SplitPreferenceResponse getSplit(Authentication authentication) {
+        return userService.getSplitPreference(authentication.getName());
     }
 
     @PutMapping
-    public Map<String, SplitType> updateSplit(@Valid @RequestBody SplitPreferenceRequest request,
-                                             Authentication authentication) {
-        return Map.of("splitType", userService.updateSplitType(authentication.getName(), request.getSplitType()));
+    public SplitPreferenceResponse updateSplit(@Valid @RequestBody SplitPreferenceRequest request,
+                                               Authentication authentication) {
+        return userService.updateSplitPreference(authentication.getName(), request);
     }
 }
