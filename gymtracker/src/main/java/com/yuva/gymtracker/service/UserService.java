@@ -6,7 +6,9 @@ import com.yuva.gymtracker.dto.SplitPreferenceRequest;
 import com.yuva.gymtracker.dto.SplitPreferenceResponse;
 import com.yuva.gymtracker.entity.User;
 import com.yuva.gymtracker.entity.SplitType;
+import com.yuva.gymtracker.entity.Workout;
 import com.yuva.gymtracker.repository.UserRepository;
+import com.yuva.gymtracker.repository.WorkoutRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,13 +22,16 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final WorkoutRepository workoutRepository;
 
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       WorkoutRepository workoutRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService=jwtService;
+        this.workoutRepository = workoutRepository;
     }
     public User saveUser(User user){
         if (userRepository.findByEmail(user.getEmail()).isPresent()) {
@@ -117,7 +122,68 @@ public class UserService {
                .id(user.getId())
                .name(user.getName())
                .email(user.getEmail())
+               .authMethod("PASSWORD")
                .build();
 
+    }
+
+    @Transactional(readOnly = true)
+    public String exportAccountCsv(String email) {
+        User user = requireUser(email);
+        StringBuilder csv = new StringBuilder("Name,Email,Age,Current Weight (kg),Goal,Split Type,Custom Split Days,Workout Date,Workout Name,Exercise,Set Number,Reps,Weight (kg),RIR\r\n");
+        List<Workout> workouts = workoutRepository.findByUserId(user.getId()).stream()
+                .sorted(java.util.Comparator.comparing(Workout::getWorkoutDate,
+                        java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
+                .toList();
+        String splitDays = user.getCustomSplitDays() == null ? "" : String.join(" | ", user.getCustomSplitDays());
+        if (workouts.isEmpty()) {
+            appendCsvRow(csv, user.getName(), user.getEmail(), user.getAge(), user.getCurrentWeight(),
+                    user.getGoal(), user.getSplitType(), splitDays, "", "", "", "", "", "");
+        }
+        for (Workout workout : workouts) {
+            if (workout.getSetDetails().isEmpty()) {
+                appendCsvRow(csv, user.getName(), user.getEmail(), user.getAge(), user.getCurrentWeight(),
+                        user.getGoal(), user.getSplitType(), splitDays, workout.getWorkoutDate(),
+                        workout.getWorkoutName(), workout.getExerciseName(), "", "", "", "");
+            } else {
+                workout.getSetDetails().forEach(set -> appendCsvRow(csv, user.getName(), user.getEmail(),
+                        user.getAge(), user.getCurrentWeight(), user.getGoal(), user.getSplitType(), splitDays,
+                        workout.getWorkoutDate(), workout.getWorkoutName(), workout.getExerciseName(),
+                        set.getSetNumber(), set.getReps(), set.getWeight(), set.getRir()));
+            }
+        }
+        return "\uFEFF" + csv;
+    }
+
+    private void appendCsvRow(StringBuilder csv, Object... values) {
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) csv.append(',');
+            String value = values[i] == null ? "" : values[i].toString();
+            csv.append('"').append(value.replace("\"", "\"\"")).append('"');
+        }
+        csv.append("\r\n");
+    }
+
+    @Transactional
+    public void deleteAccount(String email, String password, String confirmation) {
+        User user = requireUser(email);
+        if (!"DELETE".equals(confirmation)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_REQUEST, "Type DELETE to confirm account removal");
+        }
+        if (user.getGoogleSubject() == null
+                && (password == null || !passwordEncoder.matches(password, user.getPassword()))) {
+            throw new org.springframework.security.authentication.BadCredentialsException("Password is incorrect");
+        }
+        workoutRepository.deleteSetsByUserId(user.getId());
+        workoutRepository.deleteWorkoutsByUserId(user.getId());
+        userRepository.deleteCustomSplitDaysByUserId(user.getId());
+        userRepository.delete(user);
+    }
+
+    private User requireUser(String email) {
+        return userRepository.findByEmail(email.trim().toLowerCase(java.util.Locale.ROOT))
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "User not found"));
     }
 }

@@ -24,8 +24,9 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/index.html", "/app.js", "/styles.css", "/favicon.ico", "/error").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/users/register", "/users/login").permitAll()
+                        .requestMatchers("/", "/index.html", "/app.js", "/exercise-catalog.js", "/styles.css", "/favicon.ico", "/error", "/manifest.webmanifest", "/service-worker.js", "/icons/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/users/register", "/users/login", "/auth/google/login").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/google/config").permitAll()
                         .anyRequest().authenticated()
                 );
         return http.build();

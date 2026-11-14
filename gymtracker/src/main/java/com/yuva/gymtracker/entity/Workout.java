@@ -20,6 +20,8 @@ public class Workout {
     @GeneratedValue(strategy = GenerationType.IDENTITY )
     private Long id;
     private String workoutName;
+    @Column(name = "session_id", length = 36)
+    private String sessionId;
     private String exerciseName;
     private Integer sets;
     private Integer reps;

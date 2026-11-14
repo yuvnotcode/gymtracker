@@ -4,6 +4,7 @@ import com.yuva.gymtracker.dto.LoginRequestDto;
 import com.yuva.gymtracker.dto.LoginResponseDto;
 import com.yuva.gymtracker.dto.UserRequestDto;
 import com.yuva.gymtracker.dto.UserResponseDto;
+import com.yuva.gymtracker.dto.DeleteAccountRequest;
 import com.yuva.gymtracker.entity.User;
 import com.yuva.gymtracker.service.UserService;
 import jakarta.validation.Valid;
@@ -11,6 +12,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.core.Authentication;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ContentDisposition;
+import java.nio.charset.StandardCharsets;
 
 
 @RestController
@@ -53,5 +60,24 @@ public class UserController {
     public LoginResponseDto login(
             @Valid @RequestBody LoginRequestDto requestDto){
         return userService.login(requestDto);
+    }
+
+    @GetMapping("/me/export")
+    public ResponseEntity<byte[]> exportAccount(Authentication authentication) {
+        byte[] csv = userService.exportAccountCsv(authentication.getName()).getBytes(StandardCharsets.UTF_8);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8));
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename("gymtracker-account-export.csv", StandardCharsets.UTF_8).build());
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(csv);
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteAccount(@Valid @RequestBody DeleteAccountRequest request,
+                                               Authentication authentication) {
+        userService.deleteAccount(authentication.getName(), request.getPassword(), request.getConfirmation());
+        return ResponseEntity.noContent().build();
     }
 }

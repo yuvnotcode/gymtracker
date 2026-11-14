@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: gymtracker
+    runtime: docker
+    plan: free
+    dockerfilePath: ./gymtracker/Dockerfile
+    dockerContext: ./gymtracker
+    healthCheckPath: /
+    envVars:
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: APP_REGISTRATION_CODE
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false

@@ -54,6 +54,7 @@ public class WorkoutService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Add a workout name and between 1 and 30 exercises");
         }
         java.time.LocalDate date = request.getWorkoutDate() == null ? java.time.LocalDate.now() : request.getWorkoutDate();
+        String sessionId = java.util.UUID.randomUUID().toString();
         List<Workout> saved = new ArrayList<>();
         for (WorkoutSessionRequest.ExerciseEntry exercise : request.getExercises()) {
             if (exercise.getExerciseName() == null || exercise.getExerciseName().isBlank()
@@ -61,7 +62,7 @@ public class WorkoutService {
                     || exercise.getSets().isEmpty() || exercise.getSets().size() > 30) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Each exercise needs a name and 1 to 30 sets");
             }
-            Workout workout = Workout.builder().workoutName(request.getWorkoutName().trim())
+            Workout workout = Workout.builder().sessionId(sessionId).workoutName(request.getWorkoutName().trim())
                     .exerciseName(exercise.getExerciseName().trim()).workoutDate(date).user(user)
                     .sets(exercise.getSets().size()).build();
             int number = 1;
