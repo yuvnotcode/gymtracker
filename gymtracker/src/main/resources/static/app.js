@@ -90,6 +90,7 @@ document.querySelectorAll('.auth-tab').forEach(button => button.addEventListener
   state.mode = button.dataset.mode;
   document.querySelectorAll('.auth-tab').forEach(tab => tab.classList.toggle('active', tab === button));
   $('#register-fields').hidden = state.mode !== 'register';
+  $('#google-registration-code-field').hidden = state.mode !== 'register';
   $('#auth-submit').innerHTML = state.mode === 'register' ? 'Create account <span>→</span>' : 'Sign in <span>→</span>';
   $('#auth-form [name="password"]').autocomplete = state.mode === 'register' ? 'new-password' : 'current-password';
   $('#auth-error').textContent = '';
