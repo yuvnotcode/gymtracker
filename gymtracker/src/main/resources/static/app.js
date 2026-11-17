@@ -197,7 +197,9 @@ function renderProgress(){
     const all=document.createElement('option');all.value='';all.textContent='All workout days';daySelect.append(all);
     workoutDays.sort((a,b)=>{const ad=recent.find(item=>item.workoutName===a)?.workoutDate||'';const bd=recent.find(item=>item.workoutName===b)?.workoutDate||'';return bd.localeCompare(ad)||a.localeCompare(b);})
       .forEach(name=>{const option=document.createElement('option');option.value=name;option.textContent=name;daySelect.append(option);});
-    daySelect.value=workoutDays.includes(previousDay)?previousDay:(recent[0]?.workoutName||'');
+      // An empty value is the intentional “All workout days” selection. Preserve
+      // it when rebuilding the selectors instead of falling back to the latest day.
+      daySelect.value=previousDay===''?'':(workoutDays.includes(previousDay)?previousDay:(recent[0]?.workoutName||''));
   }
   const matching=state.workouts.filter(item=>!daySelect.value||item.workoutName===daySelect.value);
   const exerciseMap=new Map();
